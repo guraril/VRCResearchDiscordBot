@@ -52,7 +52,7 @@ impl EventHandler for Handler {
             let jst = FixedOffset::east_opt(9 * 3600).unwrap();
             loop {
                 let now = Utc::now().with_timezone(&jst);
-                if now.time().hour() % 1 == 0 && now.time().minute() < 5 {
+                if now.time().hour() % 2 == 0 && now.time().minute() < 5 {
                     let mut cache: ReleaseCache;
                     match fs::read_to_string("./cache.json") {
                         Ok(content) => {
