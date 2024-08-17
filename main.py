@@ -1,6 +1,4 @@
 # stable版だけがいいとかがあれば言って
-# TODO: 定期実行させる
-# TODO: Discordに通知する
 # NOTE: Update、ログに書き出す？要らない？
 # NOTE: GitHub API、ログインせずに使っているので60req/hの制限がある
 
