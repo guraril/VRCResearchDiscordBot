@@ -1,2 +1,7 @@
-__pycache__/**
-celestnode_discord_bot_venv/**
+tokens.json
+cache.json
+
+
+# Added by cargo
+
+/target
