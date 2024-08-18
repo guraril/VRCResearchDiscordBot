@@ -14,9 +14,10 @@ use tokio;
 
 struct Data {}
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Tokens {
     discord_token: String,
+    channels: Vec<u64>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -29,16 +30,52 @@ struct ReleaseUrl {
     html_url: String,
 }
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type CommandContext<'a> = poise::Context<'a, Data, Error>;
-
 #[poise::command(slash_command, prefix_command)]
-async fn age(
-    ctx: CommandContext<'_>,
-    #[description = "Selected user"] user: Option<serenity::User>,
-) -> Result<(), Error> {
-    let u = user.as_ref().unwrap_or_else(|| ctx.author());
-    let response = format!("{}'s account was created at {}", u.name, u.created_at());
+async fn research_bot(
+    ctx: poise::Context<'_, Data, Box<dyn std::error::Error + Send + Sync>>,
+    command: String,
+    sub_command: String,
+    argument: String,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut tokens = Tokens {
+        discord_token: "".to_string(),
+        channels: Vec::with_capacity(8),
+    };
+    match fs::read_to_string("./tokens.json") {
+        Ok(content) => {
+            tokens = serde_json::from_str(content.as_str()).unwrap();
+        }
+        Err(_) => {}
+    }
+
+    match &*command {
+        "repo_watcher" => match &*sub_command {
+            "add" => match &*argument {
+                "AvatarOptimizer" => tokens.channels[0] = ctx.channel_id().into(),
+                "ModularAvatar" => tokens.channels[1] = ctx.channel_id().into(),
+                "lilToon" => tokens.channels[2] = ctx.channel_id().into(),
+                "TexTransTool" => tokens.channels[3] = ctx.channel_id().into(),
+                "VRCSDK" => tokens.channels[4] = ctx.channel_id().into(),
+                "VRCFury" => tokens.channels[5] = ctx.channel_id().into(),
+                "lilycalInventory" => tokens.channels[6] = ctx.channel_id().into(),
+                "FaceEmo" => tokens.channels[7] = ctx.channel_id().into(),
+                _ => {
+                    println!("unknown repo");
+                }
+            },
+            _ => {
+                println!("unknown subcommand")
+            }
+        },
+        _ => {
+            println!("unknown command")
+        }
+    }
+    let mut file = File::create("./tokens.json").unwrap();
+    file.write_all(serde_json::to_string(&tokens).unwrap().as_bytes())
+        .unwrap();
+    file.flush().unwrap();
+    let response = format!("Notification enabled, at channel ID: {}", &ctx.channel_id());
     ctx.say(response).await?;
     Ok(())
 }
@@ -47,7 +84,6 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, _ready: Ready) {
-        let channel_id: u64 = 1274288677845209153;
         tokio::spawn(async move {
             let jst = FixedOffset::east_opt(9 * 3600).unwrap();
             loop {
@@ -61,6 +97,18 @@ impl EventHandler for Handler {
                         Err(_) => {
                             cache = ReleaseCache {
                                 releases: Vec::new(),
+                            }
+                        }
+                    }
+                    let tokens: Tokens;
+                    match fs::read_to_string("./tokens.json") {
+                        Ok(content) => {
+                            tokens = serde_json::from_str(content.as_str()).unwrap();
+                        }
+                        Err(_) => {
+                            tokens = Tokens {
+                                discord_token: "".to_string(),
+                                channels: Vec::with_capacity(8),
                             }
                         }
                     }
@@ -94,13 +142,18 @@ impl EventHandler for Handler {
                         }
                         if new_cache.releases[i] != cache.releases[i] {
                             println!("New Release found!: {}", &new_cache.releases[i]);
-                            ChannelId::new(channel_id)
+                            ChannelId::new(tokens.channels[i])
                                 .send_message(
                                     &ctx.http,
                                     CreateMessage::new().content(&new_cache.releases[i]),
                                 )
                                 .await
                                 .unwrap();
+                        } else {
+                            println!(
+                                "No Updates found. latest release is: {}",
+                                &new_cache.releases[i]
+                            )
                         }
                     }
                     let mut file = File::create("./cache.json").unwrap();
@@ -121,7 +174,7 @@ async fn main() {
     let bot_token: String = tokens.discord_token;
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![age()],
+            commands: vec![research_bot()],
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
