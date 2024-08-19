@@ -1,16 +1,14 @@
 use chrono::{FixedOffset, Timelike, Utc};
-use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::{
+    self as serenity,
     all::{ChannelId, Context, CreateMessage, EventHandler, GatewayIntents, Ready},
     async_trait,
 };
-use reqwest;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::Write,
 };
-use tokio;
 
 struct Data {}
 
@@ -30,6 +28,49 @@ struct ReleaseUrl {
     html_url: String,
 }
 
+fn save_cache(new_cache: &ReleaseCache) {
+    if let Ok(mut file) = File::create("./cache.json") {
+        if let Ok(json) = serde_json::to_string(&new_cache) {
+            file.write_all(json.as_bytes()).ok();
+        }
+        file.flush().ok();
+    }
+}
+
+fn load_cache() -> ReleaseCache {
+    let mut cache = ReleaseCache {
+        releases: Vec::new(),
+    };
+    if let Ok(content) = fs::read_to_string("./cache.json") {
+        if let Ok(json) = serde_json::from_str(content.as_str()) {
+            cache = json;
+        };
+    };
+    cache
+}
+
+fn save_tokens(tokens: &Tokens) {
+    if let Ok(mut file) = File::create("./tokens.json") {
+        if let Ok(json) = serde_json::to_string(&tokens) {
+            file.write_all(json.as_bytes()).ok();
+        }
+        file.flush().ok();
+    };
+}
+
+fn load_tokens() -> Tokens {
+    let mut tokens = Tokens {
+        discord_token: "".to_string(),
+        channels: Vec::with_capacity(8),
+    };
+    if let Ok(content) = fs::read_to_string("./tokens.json") {
+        if let Ok(data) = serde_json::from_str(content.as_str()) {
+            tokens = data;
+        };
+    }
+    tokens
+}
+
 #[poise::command(slash_command, prefix_command)]
 async fn research_bot(
     ctx: poise::Context<'_, Data, Box<dyn std::error::Error + Send + Sync>>,
@@ -37,16 +78,7 @@ async fn research_bot(
     sub_command: String,
     argument: String,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let mut tokens = Tokens {
-        discord_token: "".to_string(),
-        channels: Vec::with_capacity(8),
-    };
-    match fs::read_to_string("./tokens.json") {
-        Ok(content) => {
-            tokens = serde_json::from_str(content.as_str()).unwrap();
-        }
-        Err(_) => {}
-    }
+    let mut tokens = load_tokens();
 
     match &*command {
         "repo_watcher" => match &*sub_command {
@@ -71,10 +103,7 @@ async fn research_bot(
             println!("unknown command")
         }
     }
-    let mut file = File::create("./tokens.json").unwrap();
-    file.write_all(serde_json::to_string(&tokens).unwrap().as_bytes())
-        .unwrap();
-    file.flush().unwrap();
+    save_tokens(&tokens);
     let response = format!("Notification enabled, at channel ID: {}", &ctx.channel_id());
     ctx.say(response).await?;
     Ok(())
@@ -89,35 +118,14 @@ impl EventHandler for Handler {
             loop {
                 let now = Utc::now().with_timezone(&jst);
                 if now.time().hour() % 2 == 0 && now.time().minute() < 5 {
-                    let mut cache: ReleaseCache;
-                    match fs::read_to_string("./cache.json") {
-                        Ok(content) => {
-                            cache = serde_json::from_str(content.as_str()).unwrap();
-                        }
-                        Err(_) => {
-                            cache = ReleaseCache {
-                                releases: Vec::new(),
-                            }
-                        }
-                    }
-                    let tokens: Tokens;
-                    match fs::read_to_string("./tokens.json") {
-                        Ok(content) => {
-                            tokens = serde_json::from_str(content.as_str()).unwrap();
-                        }
-                        Err(_) => {
-                            tokens = Tokens {
-                                discord_token: "".to_string(),
-                                channels: Vec::with_capacity(8),
-                            }
-                        }
-                    }
+                    let mut cache = load_cache();
+                    let tokens = load_tokens();
                     let mut new_cache = ReleaseCache {
                         releases: Vec::with_capacity(8),
                     };
 
                     let client = reqwest::Client::new();
-                    let request_urls = vec![
+                    let request_urls = [
                         "https://api.github.com/repos/anatawa12/AvatarOptimizer/releases/latest",
                         "https://api.github.com/repos/bdunderscore/modular-avatar/releases/latest",
                         "https://api.github.com/repos/lilxyzw/liltoon/releases/latest",
@@ -128,15 +136,19 @@ impl EventHandler for Handler {
                         "https://api.github.com/repos/suzuryg/face-emo/releases/latest",
                     ];
                     for (i, val) in request_urls.iter().enumerate() {
-                        let response = client
+                        if let Ok(response) = client
                             .get(*val)
                             .header("User-Agent", "Awesome")
                             .send()
                             .await
-                            .unwrap();
-                        let body: ReleaseUrl =
-                            serde_json::from_str(response.text().await.unwrap().as_str()).unwrap();
-                        new_cache.releases.push(body.html_url);
+                        {
+                            if let Ok(json) =
+                                serde_json::from_str(response.text().await.unwrap().as_str())
+                            {
+                                let body: ReleaseUrl = json;
+                                new_cache.releases.push(body.html_url);
+                            }
+                        }
                         if cache.releases.len() <= i {
                             cache.releases.push("".to_string());
                         }
@@ -156,10 +168,7 @@ impl EventHandler for Handler {
                             )
                         }
                     }
-                    let mut file = File::create("./cache.json").unwrap();
-                    file.write_all(serde_json::to_string(&new_cache).unwrap().as_bytes())
-                        .unwrap();
-                    file.flush().unwrap();
+                    save_cache(&new_cache);
                 }
                 tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
             }
@@ -169,9 +178,14 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
-    let tokens: Tokens =
-        serde_json::from_str(fs::read_to_string("./tokens.json").unwrap().as_str()).unwrap();
-    let bot_token: String = tokens.discord_token;
+    let mut tokens = load_tokens();
+    if tokens.discord_token == *"" {
+        println!("Please type discord bot token here> ");
+        std::io::stdin().read_line(&mut tokens.discord_token).ok();
+        tokens.discord_token = tokens.discord_token.replace("\n", "");
+
+        save_tokens(&tokens);
+    }
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![research_bot()],
@@ -184,10 +198,12 @@ async fn main() {
             })
         })
         .build();
-    let mut client = serenity::ClientBuilder::new(&bot_token, GatewayIntents::non_privileged())
-        .event_handler(Handler)
-        .framework(framework)
-        .await
-        .unwrap();
-    client.start().await.unwrap();
+    if let Ok(mut client) =
+        serenity::ClientBuilder::new(&tokens.discord_token, GatewayIntents::non_privileged())
+            .event_handler(Handler)
+            .framework(framework)
+            .await
+    {
+        if (client.start().await).is_ok() {}
+    }
 }
