@@ -40,7 +40,11 @@ async fn research_bot(
         channels: Vec::with_capacity(8),
     };
     if let Ok(content) = fs::read_to_string("./tokens.json") {
-        tokens = serde_json::from_str(content.as_str()).unwrap();
+        if let Ok(json) = serde_json::from_str(content.as_str()) {
+            tokens = json;
+        } else {
+            std::io::stdin().read_line(&mut tokens.discord_token).ok();
+        }
     }
 
     match &*command {
