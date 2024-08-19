@@ -37,6 +37,15 @@ fn save_cache(new_cache: &ReleaseCache) {
     }
 }
 
+fn save_tokens(tokens: &Tokens) {
+    if let Ok(mut file) = File::create("./tokens.json") {
+        if let Ok(json) = serde_json::to_string(&tokens) {
+            file.write_all(json.as_bytes()).ok();
+        }
+        file.flush().ok();
+    };
+}
+
 fn load_tokens() -> Tokens {
     let mut tokens = Tokens {
         discord_token: "".to_string(),
@@ -82,12 +91,7 @@ async fn research_bot(
             println!("unknown command")
         }
     }
-    if let Ok(mut file) = File::create("./tokens.json") {
-        if let Ok(json) = serde_json::to_string(&tokens) {
-            file.write_all(json.as_bytes()).ok();
-        }
-        file.flush().ok();
-    };
+    save_tokens(&tokens);
     let response = format!("Notification enabled, at channel ID: {}", &ctx.channel_id());
     ctx.say(response).await?;
     Ok(())
@@ -175,12 +179,7 @@ async fn main() {
         std::io::stdin().read_line(&mut tokens.discord_token).ok();
         tokens.discord_token = tokens.discord_token.replace("\n", "");
 
-        if let Ok(mut file) = File::create("./tokens.json") {
-            if let Ok(json) = serde_json::to_string(&tokens) {
-                file.write_all(json.as_bytes()).ok();
-            }
-            file.flush().ok();
-        };
+        save_tokens(&tokens);
     }
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
