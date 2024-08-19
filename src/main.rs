@@ -102,7 +102,9 @@ impl EventHandler for Handler {
                         channels: Vec::with_capacity(8),
                     };
                     if let Ok(content) = fs::read_to_string("./tokens.json") {
-                        tokens = serde_json::from_str(content.as_str()).unwrap();
+                        if let Ok(json) = serde_json::from_str(content.as_str()) {
+                            tokens = json;
+                        };
                     }
                     let mut new_cache = ReleaseCache {
                         releases: Vec::with_capacity(8),
