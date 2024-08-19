@@ -37,6 +37,18 @@ fn save_cache(new_cache: &ReleaseCache) {
     }
 }
 
+fn load_cache() -> ReleaseCache {
+    let mut cache = ReleaseCache {
+        releases: Vec::new(),
+    };
+    if let Ok(content) = fs::read_to_string("./cache.json") {
+        if let Ok(json) = serde_json::from_str(content.as_str()) {
+            cache = json;
+        };
+    };
+    cache
+}
+
 fn save_tokens(tokens: &Tokens) {
     if let Ok(mut file) = File::create("./tokens.json") {
         if let Ok(json) = serde_json::to_string(&tokens) {
@@ -106,14 +118,7 @@ impl EventHandler for Handler {
             loop {
                 let now = Utc::now().with_timezone(&jst);
                 if now.time().hour() % 2 == 0 && now.time().minute() < 5 {
-                    let mut cache = ReleaseCache {
-                        releases: Vec::new(),
-                    };
-                    if let Ok(content) = fs::read_to_string("./cache.json") {
-                        if let Ok(json) = serde_json::from_str(content.as_str()) {
-                            cache = json;
-                        };
-                    }
+                    let mut cache = load_cache();
                     let tokens = load_tokens();
                     let mut new_cache = ReleaseCache {
                         releases: Vec::with_capacity(8),
