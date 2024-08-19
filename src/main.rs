@@ -121,15 +121,19 @@ impl EventHandler for Handler {
                         "https://api.github.com/repos/suzuryg/face-emo/releases/latest",
                     ];
                     for (i, val) in request_urls.iter().enumerate() {
-                        let response = client
+                        if let Ok(response) = client
                             .get(*val)
                             .header("User-Agent", "Awesome")
                             .send()
                             .await
-                            .unwrap();
-                        let body: ReleaseUrl =
-                            serde_json::from_str(response.text().await.unwrap().as_str()).unwrap();
-                        new_cache.releases.push(body.html_url);
+                        {
+                            if let Ok(json) =
+                                serde_json::from_str(response.text().await.unwrap().as_str())
+                            {
+                                let body: ReleaseUrl = json;
+                                new_cache.releases.push(body.html_url);
+                            }
+                        }
                         if cache.releases.len() <= i {
                             cache.releases.push("".to_string());
                         }
