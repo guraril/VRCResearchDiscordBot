@@ -184,7 +184,6 @@ async fn main() {
             file.flush().ok();
         };
     }
-    let bot_token: String = tokens.discord_token;
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![research_bot()],
@@ -197,10 +196,11 @@ async fn main() {
             })
         })
         .build();
-    let mut client = serenity::ClientBuilder::new(&bot_token, GatewayIntents::non_privileged())
-        .event_handler(Handler)
-        .framework(framework)
-        .await
-        .unwrap();
+    let mut client =
+        serenity::ClientBuilder::new(&tokens.discord_token, GatewayIntents::non_privileged())
+            .event_handler(Handler)
+            .framework(framework)
+            .await
+            .unwrap();
     client.start().await.unwrap();
 }
