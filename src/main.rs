@@ -13,6 +13,16 @@ use std::{
 struct Data {}
 
 #[derive(Debug, Deserialize, Serialize)]
+struct GitHubRequest {
+    name: String,
+    url: String,
+}
+#[derive(Debug, Deserialize, Serialize)]
+struct RequestLists {
+    github_requests: Vec<GitHubRequest>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct Tokens {
     discord_token: String,
     channels: Vec<u64>,
@@ -26,6 +36,18 @@ struct ReleaseCache {
 #[derive(Debug, Deserialize)]
 struct ReleaseUrl {
     html_url: String,
+}
+
+fn load_request_lists() -> RequestLists {
+    let mut lists = RequestLists {
+        github_requests: Vec::new(),
+    };
+    if let Ok(content) = fs::read_to_string("./request_lists.json") {
+        if let Ok(json) = serde_json::from_str(content.as_str()) {
+            lists = json;
+        }
+    }
+    lists
 }
 
 fn save_cache(new_cache: &ReleaseCache) {
@@ -79,6 +101,7 @@ async fn research_bot(
     argument: String,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut tokens = load_tokens();
+    let request_lists = load_request_lists();
 
     match &*command {
         "repo_watcher" => match &*sub_command {
@@ -96,11 +119,11 @@ async fn research_bot(
                 }
             },
             _ => {
-                println!("unknown subcommand")
+                println!("unknown subcommand");
             }
         },
         _ => {
-            println!("unknown command")
+            println!("unknown command");
         }
     }
     save_tokens(&tokens);
@@ -120,24 +143,16 @@ impl EventHandler for Handler {
                 if now.time().hour() % 2 == 0 && now.time().minute() < 5 {
                     let mut cache = load_cache();
                     let tokens = load_tokens();
+                    let request_lists = load_request_lists();
                     let mut new_cache = ReleaseCache {
-                        releases: Vec::with_capacity(8),
+                        releases: Vec::with_capacity(request_lists.github_requests.len()),
                     };
 
                     let client = reqwest::Client::new();
-                    let request_urls = [
-                        "https://api.github.com/repos/anatawa12/AvatarOptimizer/releases/latest",
-                        "https://api.github.com/repos/bdunderscore/modular-avatar/releases/latest",
-                        "https://api.github.com/repos/lilxyzw/liltoon/releases/latest",
-                        "https://api.github.com/repos/ReinaS-64892/TexTransTool/releases/latest",
-                        "https://api.github.com/repos/vrchat/packages/releases/latest",
-                        "https://api.github.com/repos/VRCFury/VRCFury/releases/latest",
-                        "https://api.github.com/repos/lilxyzw/lilycalInventory/releases/latest",
-                        "https://api.github.com/repos/suzuryg/face-emo/releases/latest",
-                    ];
-                    for (i, val) in request_urls.iter().enumerate() {
+                    for (i, val) in request_lists.github_requests.iter().enumerate() {
+                        println!("{}: {}", &val.name, &val.url);
                         if let Ok(response) = client
-                            .get(*val)
+                            .get(&val.url)
                             .header("User-Agent", "Awesome")
                             .send()
                             .await
