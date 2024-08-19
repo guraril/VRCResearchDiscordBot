@@ -68,10 +68,12 @@ async fn research_bot(
             println!("unknown command")
         }
     }
-    let mut file = File::create("./tokens.json").unwrap();
-    file.write_all(serde_json::to_string(&tokens).unwrap().as_bytes())
-        .unwrap();
-    file.flush().unwrap();
+    if let Ok(mut file) = File::create("./tokens.json") {
+        if let Ok(json) = serde_json::to_string(&tokens) {
+            file.write_all(json.as_bytes()).ok();
+        }
+        file.flush().ok();
+    };
     let response = format!("Notification enabled, at channel ID: {}", &ctx.channel_id());
     ctx.say(response).await?;
     Ok(())
