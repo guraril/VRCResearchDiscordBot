@@ -1,6 +1,6 @@
 use chrono::{FixedOffset, Timelike, Utc};
-use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::{
+    self as serenity,
     all::{ChannelId, Context, CreateMessage, EventHandler, GatewayIntents, Ready},
     async_trait,
 };
