@@ -88,16 +88,13 @@ impl EventHandler for Handler {
             loop {
                 let now = Utc::now().with_timezone(&jst);
                 if now.time().hour() % 2 == 0 && now.time().minute() < 5 {
-                    let mut cache: ReleaseCache;
-                    match fs::read_to_string("./cache.json") {
-                        Ok(content) => {
-                            cache = serde_json::from_str(content.as_str()).unwrap();
-                        }
-                        Err(_) => {
-                            cache = ReleaseCache {
-                                releases: Vec::new(),
-                            }
-                        }
+                    let mut cache = ReleaseCache {
+                        releases: Vec::new(),
+                    };
+                    if let Ok(content) = fs::read_to_string("./cache.json") {
+                        if let Ok(json) = serde_json::from_str(content.as_str()) {
+                            cache = json;
+                        };
                     }
                     let mut tokens = Tokens {
                         discord_token: "".to_string(),
