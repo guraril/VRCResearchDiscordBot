@@ -4,13 +4,11 @@ use poise::serenity_prelude::{
     all::{ChannelId, Context, CreateMessage, EventHandler, GatewayIntents, Ready},
     async_trait,
 };
-use reqwest;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::Write,
 };
-use tokio;
 
 struct Data {}
 
@@ -41,11 +39,8 @@ async fn research_bot(
         discord_token: "".to_string(),
         channels: Vec::with_capacity(8),
     };
-    match fs::read_to_string("./tokens.json") {
-        Ok(content) => {
-            tokens = serde_json::from_str(content.as_str()).unwrap();
-        }
-        Err(_) => {}
+    if let Ok(content) = fs::read_to_string("./tokens.json") {
+        tokens = serde_json::from_str(content.as_str()).unwrap();
     }
 
     match &*command {
@@ -100,24 +95,19 @@ impl EventHandler for Handler {
                             }
                         }
                     }
-                    let tokens: Tokens;
-                    match fs::read_to_string("./tokens.json") {
-                        Ok(content) => {
-                            tokens = serde_json::from_str(content.as_str()).unwrap();
-                        }
-                        Err(_) => {
-                            tokens = Tokens {
-                                discord_token: "".to_string(),
-                                channels: Vec::with_capacity(8),
-                            }
-                        }
+                    let mut tokens = Tokens {
+                        discord_token: "".to_string(),
+                        channels: Vec::with_capacity(8),
+                    };
+                    if let Ok(content) = fs::read_to_string("./tokens.json") {
+                        tokens = serde_json::from_str(content.as_str()).unwrap();
                     }
                     let mut new_cache = ReleaseCache {
                         releases: Vec::with_capacity(8),
                     };
 
                     let client = reqwest::Client::new();
-                    let request_urls = vec![
+                    let request_urls = [
                         "https://api.github.com/repos/anatawa12/AvatarOptimizer/releases/latest",
                         "https://api.github.com/repos/bdunderscore/modular-avatar/releases/latest",
                         "https://api.github.com/repos/lilxyzw/liltoon/releases/latest",
