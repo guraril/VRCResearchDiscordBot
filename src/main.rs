@@ -28,6 +28,15 @@ struct ReleaseUrl {
     html_url: String,
 }
 
+fn save_cache(new_cache: &ReleaseCache) {
+    if let Ok(mut file) = File::create("./cache.json") {
+        if let Ok(json) = serde_json::to_string(&new_cache) {
+            file.write_all(json.as_bytes()).ok();
+        }
+        file.flush().ok();
+    }
+}
+
 #[poise::command(slash_command, prefix_command)]
 async fn research_bot(
     ctx: poise::Context<'_, Data, Box<dyn std::error::Error + Send + Sync>>,
@@ -153,12 +162,7 @@ impl EventHandler for Handler {
                             )
                         }
                     }
-                    if let Ok(mut file) = File::create("./cache.json") {
-                        if let Ok(json) = serde_json::to_string(&new_cache) {
-                            file.write_all(json.as_bytes()).ok();
-                        }
-                        file.flush().ok();
-                    }
+                    save_cache(&new_cache);
                 }
                 tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
             }
