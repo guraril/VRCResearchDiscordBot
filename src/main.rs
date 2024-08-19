@@ -37,6 +37,19 @@ fn save_cache(new_cache: &ReleaseCache) {
     }
 }
 
+fn load_tokens() -> Tokens {
+    let mut tokens = Tokens {
+        discord_token: "".to_string(),
+        channels: Vec::with_capacity(8),
+    };
+    if let Ok(content) = fs::read_to_string("./tokens.json") {
+        if let Ok(data) = serde_json::from_str(content.as_str()) {
+            tokens = data;
+        };
+    }
+    tokens
+}
+
 #[poise::command(slash_command, prefix_command)]
 async fn research_bot(
     ctx: poise::Context<'_, Data, Box<dyn std::error::Error + Send + Sync>>,
@@ -44,15 +57,7 @@ async fn research_bot(
     sub_command: String,
     argument: String,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let mut tokens = Tokens {
-        discord_token: "".to_string(),
-        channels: Vec::with_capacity(8),
-    };
-    if let Ok(content) = fs::read_to_string("./tokens.json") {
-        if let Ok(json) = serde_json::from_str(content.as_str()) {
-            tokens = json;
-        }
-    }
+    let mut tokens = load_tokens();
 
     match &*command {
         "repo_watcher" => match &*sub_command {
@@ -105,15 +110,7 @@ impl EventHandler for Handler {
                             cache = json;
                         };
                     }
-                    let mut tokens = Tokens {
-                        discord_token: "".to_string(),
-                        channels: Vec::with_capacity(8),
-                    };
-                    if let Ok(content) = fs::read_to_string("./tokens.json") {
-                        if let Ok(json) = serde_json::from_str(content.as_str()) {
-                            tokens = json;
-                        };
-                    }
+                    let tokens = load_tokens();
                     let mut new_cache = ReleaseCache {
                         releases: Vec::with_capacity(8),
                     };
@@ -172,15 +169,7 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
-    let mut tokens = Tokens {
-        discord_token: "".to_string(),
-        channels: Vec::with_capacity(8),
-    };
-    if let Ok(content) = fs::read_to_string("./tokens.json") {
-        if let Ok(json) = serde_json::from_str(content.as_str()) {
-            tokens = json;
-        }
-    }
+    let mut tokens = load_tokens();
     if tokens.discord_token == *"" {
         println!("Please type discord bot token here> ");
         std::io::stdin().read_line(&mut tokens.discord_token).ok();
