@@ -42,9 +42,6 @@ async fn research_bot(
     if let Ok(content) = fs::read_to_string("./tokens.json") {
         if let Ok(json) = serde_json::from_str(content.as_str()) {
             tokens = json;
-        } else {
-            print!("Please type discord bot token here> ");
-            std::io::stdin().read_line(&mut tokens.discord_token).ok();
         }
     }
 
