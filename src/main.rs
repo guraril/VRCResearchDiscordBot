@@ -213,11 +213,12 @@ async fn main() {
             })
         })
         .build();
-    let mut client =
+    if let Ok(mut client) =
         serenity::ClientBuilder::new(&tokens.discord_token, GatewayIntents::non_privileged())
             .event_handler(Handler)
             .framework(framework)
             .await
-            .unwrap();
-    client.start().await.unwrap();
+    {
+        if (client.start().await).is_ok() {}
+    }
 }
