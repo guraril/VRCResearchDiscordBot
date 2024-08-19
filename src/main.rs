@@ -163,8 +163,27 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
-    let tokens: Tokens =
-        serde_json::from_str(fs::read_to_string("./tokens.json").unwrap().as_str()).unwrap();
+    let mut tokens = Tokens {
+        discord_token: "".to_string(),
+        channels: Vec::with_capacity(8),
+    };
+    if let Ok(content) = fs::read_to_string("./tokens.json") {
+        if let Ok(json) = serde_json::from_str(content.as_str()) {
+            tokens = json;
+        }
+    }
+    if tokens.discord_token == *"" {
+        println!("Please type discord bot token here> ");
+        std::io::stdin().read_line(&mut tokens.discord_token).ok();
+        tokens.discord_token = tokens.discord_token.replace("\n", "");
+
+        if let Ok(mut file) = File::create("./tokens.json") {
+            if let Ok(json) = serde_json::to_string(&tokens) {
+                file.write_all(json.as_bytes()).ok();
+            }
+            file.flush().ok();
+        };
+    }
     let bot_token: String = tokens.discord_token;
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
