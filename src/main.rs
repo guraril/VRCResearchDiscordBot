@@ -153,10 +153,12 @@ impl EventHandler for Handler {
                             )
                         }
                     }
-                    let mut file = File::create("./cache.json").unwrap();
-                    file.write_all(serde_json::to_string(&new_cache).unwrap().as_bytes())
-                        .unwrap();
-                    file.flush().unwrap();
+                    if let Ok(mut file) = File::create("./cache.json") {
+                        if let Ok(json) = serde_json::to_string(&new_cache) {
+                            file.write_all(json.as_bytes()).ok();
+                        }
+                        file.flush().ok();
+                    }
                 }
                 tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
             }
