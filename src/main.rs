@@ -256,7 +256,7 @@ impl EventHandler for Handler {
                         };
                     }
                     save_cache(&new_cache);
-                }
+                };
                 tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
             }
         });
