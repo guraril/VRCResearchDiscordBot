@@ -2233,6 +2233,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "env_logger",
+ "log",
  "poise",
  "reqwest 0.12.5",
  "serde",
