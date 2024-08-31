@@ -1,0 +1,36 @@
+{
+    "github_requests": [
+        {
+            "name": "AvatarOptimizer",
+            "url": "https://api.github.com/repos/anatawa12/AvatarOptimizer/releases/latest"
+        },
+        {
+            "name": "ModularAvatar",
+            "url": "https://api.github.com/repos/bdunderscore/modular-avatar/releases/latest"
+        },
+        {
+            "name": "lilToon",
+            "url": "https://api.github.com/repos/lilxyzw/liltoon/releases/latest"
+        },
+        {
+            "name": "TexTransTool",
+            "url": "https://api.github.com/repos/ReinaS-64892/TexTransTool/releases/latest"
+        },
+        {
+            "name": "VRCSDK",
+            "url": "https://api.github.com/repos/vrchat/packages/releases/latest"
+        },
+        {
+            "name": "VRCFury",
+            "url": "https://api.github.com/repos/VRCFury/VRCFury/releases/latest"
+        },
+        {
+            "name": "lilycalInventory",
+            "url": "https://api.github.com/repos/lilxyzw/lilycalInventory/releases/latest"
+        },
+        {
+            "name": "FaceEmo",
+            "url": "https://api.github.com/repos/suzuryg/face-emo/releases/latest"
+        }
+    ]
+}

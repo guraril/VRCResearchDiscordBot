@@ -1,4 +1,5 @@
-use chrono::{FixedOffset, Timelike, Utc};
+// TODO: 各変数が目的にあった名前か確認する
+use chrono::{Timelike, Utc};
 use poise::serenity_prelude::{
     self as serenity,
     all::{ChannelId, Context, CreateMessage, EventHandler, GatewayIntents, Ready},
@@ -13,19 +14,51 @@ use std::{
 struct Data {}
 
 #[derive(Debug, Deserialize, Serialize)]
+struct ReleaseInfo {
+    name: String,
+    url: String,
+}
+// 厳密にはこれらは違うものですが、構造が全く同じなので共通化しました
+type GitHubRequest = ReleaseInfo;
+
+#[derive(Debug, Deserialize, Serialize)]
+struct RequestLists {
+    github_requests: Vec<GitHubRequest>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct Tokens {
     discord_token: String,
     channels: Vec<u64>,
+    github_release_notifications: Vec<GitHubReleaseNotifications>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct GitHubReleaseNotifications {
+    name: String,
+    channel_id: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ReleaseCache {
-    releases: Vec<String>,
+    releases: Vec<ReleaseInfo>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ReleaseUrl {
     html_url: String,
+}
+
+fn load_request_lists() -> RequestLists {
+    let mut lists = RequestLists {
+        github_requests: Vec::new(),
+    };
+    if let Ok(content) = fs::read_to_string("./request_lists.json") {
+        if let Ok(json) = serde_json::from_str(content.as_str()) {
+            lists = json;
+        }
+    }
+    lists
 }
 
 fn save_cache(new_cache: &ReleaseCache) {
@@ -45,7 +78,7 @@ fn load_cache() -> ReleaseCache {
         if let Ok(json) = serde_json::from_str(content.as_str()) {
             cache = json;
         };
-    };
+    }
     cache
 }
 
@@ -62,6 +95,7 @@ fn load_tokens() -> Tokens {
     let mut tokens = Tokens {
         discord_token: "".to_string(),
         channels: Vec::with_capacity(8),
+        github_release_notifications: Vec::new(),
     };
     if let Ok(content) = fs::read_to_string("./tokens.json") {
         if let Ok(data) = serde_json::from_str(content.as_str()) {
@@ -79,6 +113,7 @@ async fn research_bot(
     argument: String,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut tokens = load_tokens();
+    // let request_lists = load_request_lists();
 
     match &*command {
         "repo_watcher" => match &*sub_command {
@@ -96,11 +131,11 @@ async fn research_bot(
                 }
             },
             _ => {
-                println!("unknown subcommand")
+                println!("unknown subcommand");
             }
         },
         _ => {
-            println!("unknown command")
+            println!("unknown command");
         }
     }
     save_tokens(&tokens);
@@ -114,59 +149,120 @@ struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, _ready: Ready) {
         tokio::spawn(async move {
-            let jst = FixedOffset::east_opt(9 * 3600).unwrap();
             loop {
-                let now = Utc::now().with_timezone(&jst);
+                let now = Utc::now();
                 if now.time().hour() % 2 == 0 && now.time().minute() < 5 {
-                    let mut cache = load_cache();
+                    let cache = load_cache();
+                    let request_lists = load_request_lists();
                     let tokens = load_tokens();
-                    let mut new_cache = ReleaseCache {
-                        releases: Vec::with_capacity(8),
+                    let mut new_cache: ReleaseCache = ReleaseCache {
+                        releases: Vec::new(),
                     };
-
                     let client = reqwest::Client::new();
-                    let request_urls = [
-                        "https://api.github.com/repos/anatawa12/AvatarOptimizer/releases/latest",
-                        "https://api.github.com/repos/bdunderscore/modular-avatar/releases/latest",
-                        "https://api.github.com/repos/lilxyzw/liltoon/releases/latest",
-                        "https://api.github.com/repos/ReinaS-64892/TexTransTool/releases/latest",
-                        "https://api.github.com/repos/vrchat/packages/releases/latest",
-                        "https://api.github.com/repos/VRCFury/VRCFury/releases/latest",
-                        "https://api.github.com/repos/lilxyzw/lilycalInventory/releases/latest",
-                        "https://api.github.com/repos/suzuryg/face-emo/releases/latest",
-                    ];
-                    for (i, val) in request_urls.iter().enumerate() {
+                    for (i, val) in request_lists.github_requests.iter().enumerate() {
+                        new_cache.releases.push(ReleaseInfo {
+                            name: String::from(&val.name),
+                            url: String::from(""),
+                        });
                         if let Ok(response) = client
-                            .get(*val)
+                            .get(&val.url)
                             .header("User-Agent", "Awesome")
                             .send()
                             .await
                         {
-                            if let Ok(json) =
-                                serde_json::from_str(response.text().await.unwrap().as_str())
-                            {
-                                let body: ReleaseUrl = json;
-                                new_cache.releases.push(body.html_url);
+                            if let Ok(text) = response.text().await {
+                                if let Ok(json) = serde_json::from_str(&text) {
+                                    let body: ReleaseUrl = json;
+                                    new_cache.releases[i].url = String::from(&body.html_url);
+                                    println!("[Info]: Fetched url is {}", &body.html_url);
+                                } else {
+                                    println!("[Error]: Failed to get json from response");
+                                    continue;
+                                }
+                            } else {
+                                println!("[Error]: Failed to get text from response");
+                                continue;
                             }
-                        }
-                        if cache.releases.len() <= i {
-                            cache.releases.push("".to_string());
-                        }
-                        if new_cache.releases[i] != cache.releases[i] {
-                            println!("New Release found!: {}", &new_cache.releases[i]);
-                            ChannelId::new(tokens.channels[i])
-                                .send_message(
-                                    &ctx.http,
-                                    CreateMessage::new().content(&new_cache.releases[i]),
-                                )
-                                .await
-                                .unwrap();
+                        } else {
+                            println!("[Error]: Failed to get response from GitHub");
+                            continue;
+                        };
+                        if let Some(cache_release) =
+                            cache.releases.iter().find(|&x| x.name == val.name)
+                        {
+                            if cache_release.url != new_cache.releases[i].url {
+                                println!(
+                                    "[Info]: New release found! repo: {}",
+                                    &new_cache.releases[i].name
+                                );
+                                if let Some(github_release_notification) = tokens
+                                    .github_release_notifications
+                                    .iter()
+                                    .find(|&x| x.name == val.name)
+                                {
+                                    if let Ok(_msg) =
+                                        ChannelId::new(github_release_notification.channel_id)
+                                            .send_message(
+                                                &ctx.http,
+                                                CreateMessage::new().content(
+                                                    String::from("New release found!\n{}")
+                                                        + &new_cache.releases[i].url,
+                                                ),
+                                            )
+                                            .await
+                                    {
+                                        println!(
+                                            "[Info]: Message was successfully sent. channel_id: {}",
+                                            github_release_notification.channel_id
+                                        );
+                                    } else {
+                                        println!("[Error]: Failed to send message to discord channel. channel_id: {}", github_release_notification.channel_id);
+                                    }
+                                } else {
+                                    println!(
+                                    "[Warn]: Notification is not specified for this repository."
+                                );
+                                }
+                            } else {
+                                println!(
+                                    "[Info]: No updates found. repo: {}",
+                                    new_cache.releases[i].name
+                                );
+                            }
                         } else {
                             println!(
-                                "No Updates found. latest release is: {}",
-                                &new_cache.releases[i]
-                            )
-                        }
+                                "[Info]: New release found! repo: {}",
+                                new_cache.releases[i].name
+                            );
+                            if let Some(github_release_notification) = tokens
+                                .github_release_notifications
+                                .iter()
+                                .find(|&x| x.name == val.name)
+                            {
+                                if let Ok(_msg) =
+                                    ChannelId::new(github_release_notification.channel_id)
+                                        .send_message(
+                                            &ctx.http,
+                                            CreateMessage::new().content(format!(
+                                                "New release found!\n {}",
+                                                &new_cache.releases[i].url
+                                            )),
+                                        )
+                                        .await
+                                {
+                                    println!(
+                                        "[Info]: Message was successfully sent. channel_id: {}",
+                                        github_release_notification.channel_id
+                                    );
+                                } else {
+                                    println!("[Error]: Failed to send message to discord channel. channel_id: {}", github_release_notification.channel_id);
+                                }
+                            } else {
+                                println!(
+                                    "[Warn]: Notification is not specified for this repository."
+                                );
+                            }
+                        };
                     }
                     save_cache(&new_cache);
                 }
