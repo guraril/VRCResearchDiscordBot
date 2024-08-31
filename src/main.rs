@@ -203,7 +203,7 @@ impl EventHandler for Handler {
                                             .send_message(
                                                 &ctx.http,
                                                 CreateMessage::new().content(
-                                                    String::from("New release found!\n{}")
+                                                    String::from("New release found!\n")
                                                         + &new_cache.releases[i].url,
                                                 ),
                                             )
