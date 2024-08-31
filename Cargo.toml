@@ -11,3 +11,5 @@ serde = { version = "1.0.208" }
 serde_json = { version = "1.0.125" }
 serde_derive = { version = "1.0.208" }
 reqwest = "0.12.5"
+log = { version = "0.4.22" }
+env_logger = { version = "0.11.5" }
