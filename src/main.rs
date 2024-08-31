@@ -1,5 +1,6 @@
 // TODO: 各変数が目的にあった名前か確認する
 use chrono::{Timelike, Utc};
+use log::{error, info, warn};
 use poise::serenity_prelude::{
     self as serenity,
     all::{ChannelId, Context, CreateMessage, EventHandler, GatewayIntents, Ready},
@@ -127,15 +128,15 @@ async fn research_bot(
                 "lilycalInventory" => tokens.channels[6] = ctx.channel_id().into(),
                 "FaceEmo" => tokens.channels[7] = ctx.channel_id().into(),
                 _ => {
-                    println!("unknown repo");
+                    warn!("unknown repo");
                 }
             },
             _ => {
-                println!("unknown subcommand");
+                warn!("unknown subcommand");
             }
         },
         _ => {
-            println!("unknown command");
+            warn!("unknown command");
         }
     }
     save_tokens(&tokens);
@@ -174,27 +175,24 @@ impl EventHandler for Handler {
                                 if let Ok(json) = serde_json::from_str(&text) {
                                     let body: ReleaseUrl = json;
                                     new_cache.releases[i].url = String::from(&body.html_url);
-                                    println!("[Info]: Fetched url is {}", &body.html_url);
+                                    info!("Fetched url is {}", &body.html_url);
                                 } else {
-                                    println!("[Error]: Failed to get json from response");
+                                    error!("Failed to get json from response");
                                     continue;
                                 }
                             } else {
-                                println!("[Error]: Failed to get text from response");
+                                error!("Failed to get text from response");
                                 continue;
                             }
                         } else {
-                            println!("[Error]: Failed to get response from GitHub");
+                            error!("Failed to get response from GitHub");
                             continue;
                         };
                         if let Some(cache_release) =
                             cache.releases.iter().find(|&x| x.name == val.name)
                         {
                             if cache_release.url != new_cache.releases[i].url {
-                                println!(
-                                    "[Info]: New release found! repo: {}",
-                                    &new_cache.releases[i].name
-                                );
+                                info!("New release found! repo: {}", &new_cache.releases[i].name);
                                 if let Some(github_release_notification) = tokens
                                     .github_release_notifications
                                     .iter()
@@ -211,29 +209,21 @@ impl EventHandler for Handler {
                                             )
                                             .await
                                     {
-                                        println!(
-                                            "[Info]: Message was successfully sent. channel_id: {}",
+                                        info!(
+                                            "Message was successfully sent. channel_id: {}",
                                             github_release_notification.channel_id
                                         );
                                     } else {
-                                        println!("[Error]: Failed to send message to discord channel. channel_id: {}", github_release_notification.channel_id);
+                                        error!("Failed to send message to discord channel. channel_id: {}", github_release_notification.channel_id);
                                     }
                                 } else {
-                                    println!(
-                                    "[Warn]: Notification is not specified for this repository."
-                                );
+                                    warn!("Notification is not specified for this repository.");
                                 }
                             } else {
-                                println!(
-                                    "[Info]: No updates found. repo: {}",
-                                    new_cache.releases[i].name
-                                );
+                                info!("No updates found. repo: {}", new_cache.releases[i].name);
                             }
                         } else {
-                            println!(
-                                "[Info]: New release found! repo: {}",
-                                new_cache.releases[i].name
-                            );
+                            info!("New release found! repo: {}", new_cache.releases[i].name);
                             if let Some(github_release_notification) = tokens
                                 .github_release_notifications
                                 .iter()
@@ -250,17 +240,18 @@ impl EventHandler for Handler {
                                         )
                                         .await
                                 {
-                                    println!(
-                                        "[Info]: Message was successfully sent. channel_id: {}",
+                                    info!(
+                                        "Message was successfully sent. channel_id: {}",
                                         github_release_notification.channel_id
                                     );
                                 } else {
-                                    println!("[Error]: Failed to send message to discord channel. channel_id: {}", github_release_notification.channel_id);
+                                    error!(
+                                        "Failed to send message to discord channel. channel_id: {}",
+                                        github_release_notification.channel_id
+                                    );
                                 }
                             } else {
-                                println!(
-                                    "[Warn]: Notification is not specified for this repository."
-                                );
+                                warn!("Notification is not specified for this repository.");
                             }
                         };
                     }
@@ -274,6 +265,12 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
+    env_logger::Builder::from_default_env()
+        .format(|buf, record| {
+            let ts = buf.timestamp();
+            writeln!(buf, "[{} {}]: {}", ts, record.level(), record.args())
+        })
+        .init();
     let mut tokens = load_tokens();
     if tokens.discord_token == *"" {
         println!("Please type discord bot token here> ");
