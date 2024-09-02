@@ -145,6 +145,44 @@ async fn research_bot(
     Ok(())
 }
 
+async fn send_update_message(
+    tokens: &Tokens,
+    i: usize,
+    val: &ReleaseInfo,
+    new_cache: &mut ReleaseCache,
+    ctx: &Context,
+) {
+    info!("New release found! repo: {}", new_cache.releases[i].name);
+    if let Some(github_release_notification) = tokens
+        .github_release_notifications
+        .iter()
+        .find(|&x| x.name == val.name)
+    {
+        if let Ok(_msg) = ChannelId::new(github_release_notification.channel_id)
+            .send_message(
+                &ctx.http,
+                CreateMessage::new().content(format!(
+                    "New release found!\n {}",
+                    &new_cache.releases[i].url
+                )),
+            )
+            .await
+        {
+            info!(
+                "Message was successfully sent. channel_id: {}",
+                github_release_notification.channel_id
+            );
+        } else {
+            error!(
+                "Failed to send message to discord channel. channel_id: {}",
+                github_release_notification.channel_id
+            );
+        }
+    } else {
+        warn!("Notification is not specified for this repository.");
+    }
+}
+
 struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
@@ -193,67 +231,12 @@ impl EventHandler for Handler {
                             cache.releases.iter().find(|&x| x.name == val.name)
                         {
                             if cache_release.url != new_cache.releases[i].url {
-                                info!("New release found! repo: {}", &new_cache.releases[i].name);
-                                if let Some(github_release_notification) = tokens
-                                    .github_release_notifications
-                                    .iter()
-                                    .find(|&x| x.name == val.name)
-                                {
-                                    if let Ok(_msg) =
-                                        ChannelId::new(github_release_notification.channel_id)
-                                            .send_message(
-                                                &ctx.http,
-                                                CreateMessage::new().content(
-                                                    String::from("New release found!\n")
-                                                        + &new_cache.releases[i].url,
-                                                ),
-                                            )
-                                            .await
-                                    {
-                                        info!(
-                                            "Message was successfully sent. channel_id: {}",
-                                            github_release_notification.channel_id
-                                        );
-                                    } else {
-                                        error!("Failed to send message to discord channel. channel_id: {}", github_release_notification.channel_id);
-                                    }
-                                } else {
-                                    warn!("Notification is not specified for this repository.");
-                                }
+                                send_update_message(&tokens, i, val, &mut new_cache, &ctx).await;
                             } else {
                                 info!("No updates found. repo: {}", new_cache.releases[i].name);
                             }
                         } else {
-                            info!("New release found! repo: {}", new_cache.releases[i].name);
-                            if let Some(github_release_notification) = tokens
-                                .github_release_notifications
-                                .iter()
-                                .find(|&x| x.name == val.name)
-                            {
-                                if let Ok(_msg) =
-                                    ChannelId::new(github_release_notification.channel_id)
-                                        .send_message(
-                                            &ctx.http,
-                                            CreateMessage::new().content(format!(
-                                                "New release found!\n {}",
-                                                &new_cache.releases[i].url
-                                            )),
-                                        )
-                                        .await
-                                {
-                                    info!(
-                                        "Message was successfully sent. channel_id: {}",
-                                        github_release_notification.channel_id
-                                    );
-                                } else {
-                                    error!(
-                                        "Failed to send message to discord channel. channel_id: {}",
-                                        github_release_notification.channel_id
-                                    );
-                                }
-                            } else {
-                                warn!("Notification is not specified for this repository.");
-                            }
+                            send_update_message(&tokens, i, val, &mut new_cache, &ctx).await;
                         };
                     }
                     save_cache(&new_cache);
