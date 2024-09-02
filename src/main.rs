@@ -263,14 +263,34 @@ impl EventHandler for Handler {
     }
 }
 
+fn init_logger() {
+    let base_conf = fern::Dispatch::new()
+        .level(log::LevelFilter::Warn)
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {} {}]: {}",
+                chrono::Local::now().format("%Y-%m-%dT%H:%M:%SZ"),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level_for("vrc_research_bot", log::LevelFilter::Debug)
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {}]: {}",
+                chrono::Local::now().format("%Y-%m-%dT%H:%M:%SZ"),
+                record.level(),
+                message
+            ))
+        })
+        .chain(std::io::stdout());
+    base_conf.apply().ok();
+}
+
 #[tokio::main]
 async fn main() {
-    env_logger::Builder::from_default_env()
-        .format(|buf, record| {
-            let ts = buf.timestamp();
-            writeln!(buf, "[{} {}]: {}", ts, record.level(), record.args())
-        })
-        .init();
+    init_logger();
     let mut tokens = load_tokens();
     if tokens.discord_token == *"" {
         println!("Please type discord bot token here> ");
