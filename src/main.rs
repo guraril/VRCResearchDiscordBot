@@ -1,6 +1,6 @@
 // TODO: 各変数が目的にあった名前か確認する
 use chrono::{Timelike, Utc};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use poise::serenity_prelude::{
     self as serenity,
     all::{ChannelId, Context, CreateMessage, EventHandler, GatewayIntents, Ready},
@@ -149,6 +149,7 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, _ready: Ready) {
+        info!("Discord bot is ready.");
         tokio::spawn(async move {
             loop {
                 let now = Utc::now();
@@ -293,6 +294,7 @@ async fn main() {
     init_logger();
     let mut tokens = load_tokens();
     if tokens.discord_token == *"" {
+        warn!("tokens.json is not found.");
         println!("Please type discord bot token here> ");
         std::io::stdin().read_line(&mut tokens.discord_token).ok();
         tokens.discord_token = tokens.discord_token.replace("\n", "");
@@ -317,6 +319,13 @@ async fn main() {
             .framework(framework)
             .await
     {
-        if (client.start().await).is_ok() {}
+        debug!("Initialized Discord bot.");
+        if (client.start().await).is_ok() {
+            info!("Discord bot is started successfully.");
+        } else {
+            error!("Discord bot was not started successfully.");
+        }
+    } else {
+        error!("Failed to initialize Discord bot.");
     }
 }
